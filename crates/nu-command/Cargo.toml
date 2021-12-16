@@ -27,7 +27,7 @@ chrono-humanize = "0.2.1"
 chrono-tz = "0.6.0"
 dtparse = "1.2.0"
 terminal_size = "0.1.17"
-indexmap = { version="1.7", features=["serde-1"] }
+indexmap = { version = "1.7", features = ["serde-1"] }
 lscolors = { version = "0.8.0", features = ["crossterm"] }
 bytesize = "1.1.0"
 dialoguer = "0.9.0"
@@ -35,12 +35,11 @@ rayon = "1.5.1"
 regex = "1.5.4"
 titlecase = "1.1.0"
 meval = "0.2.0"
-serde = { version="1.0.123", features=["derive"] }
+serde = { version = "1.0.123", features = ["derive"] }
 serde_yaml = "0.8.16"
 serde_urlencoded = "0.7.0"
 serde_ini = "0.2.0"
 eml-parser = "0.1.0"
-toml = "0.5.8"
 itertools = "0.10.0"
 ical = "0.7.0"
 calamine = "0.18.0"
@@ -53,12 +52,21 @@ lazy_static = "1.4.0"
 strip-ansi-escapes = "0.1.1"
 crossterm = "0.22.1"
 
-num = {version="0.4.0", optional=true}
+num = { version = "0.4.0", optional = true }
+toml_edit = { version = "0.10.1", features = ["serde", "easy"] }
 
 [dependencies.polars]
 version = "0.18.0"
 optional = true
-features = ["default", "parquet", "json", "serde", "object", "checked_arithmetic", "strings"]
+features = [
+    "default",
+    "parquet",
+    "json",
+    "serde",
+    "object",
+    "checked_arithmetic",
+    "strings",
+]
 
 [features]
 trash-support = ["trash"]

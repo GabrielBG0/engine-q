@@ -80,9 +80,9 @@ b = [1, 2]' | from toml",
     }
 }
 
-fn convert_toml_to_value(value: &toml::Value, span: Span) -> Value {
+fn convert_toml_to_value(value: &toml_edit::easy::Value, span: Span) -> Value {
     match value {
-        toml::Value::Array(array) => {
+        toml_edit::easy::Value::Array(array) => {
             let v: Vec<Value> = array
                 .iter()
                 .map(|x| convert_toml_to_value(x, span))
@@ -90,10 +90,10 @@ fn convert_toml_to_value(value: &toml::Value, span: Span) -> Value {
 
             Value::List { vals: v, span }
         }
-        toml::Value::Boolean(b) => Value::Bool { val: *b, span },
-        toml::Value::Float(f) => Value::Float { val: *f, span },
-        toml::Value::Integer(i) => Value::Int { val: *i, span },
-        toml::Value::Table(k) => {
+        toml_edit::easy::Value::Boolean(b) => Value::Bool { val: *b, span },
+        toml_edit::easy::Value::Float(f) => Value::Float { val: *f, span },
+        toml_edit::easy::Value::Integer(i) => Value::Int { val: *i, span },
+        toml_edit::easy::Value::Table(k) => {
             let mut cols = vec![];
             let mut vals = vec![];
 
@@ -104,11 +104,11 @@ fn convert_toml_to_value(value: &toml::Value, span: Span) -> Value {
 
             Value::Record { cols, vals, span }
         }
-        toml::Value::String(s) => Value::String {
+        toml_edit::easy::Value::String(s) => Value::String {
             val: s.clone(),
             span,
         },
-        toml::Value::Datetime(d) => Value::String {
+        toml_edit::easy::Value::Datetime(d) => Value::String {
             val: d.to_string(),
             span,
         },
@@ -116,7 +116,8 @@ fn convert_toml_to_value(value: &toml::Value, span: Span) -> Value {
 }
 
 pub fn convert_string_to_value(string_input: String, span: Span) -> Result<Value, ShellError> {
-    let result: Result<toml::Value, toml::de::Error> = toml::from_str(&string_input);
+    let result: Result<toml_edit::easy::Value, toml_edit::easy::de::Error> =
+        toml_edit::easy::from_str(&string_input);
     match result {
         Ok(value) => Ok(convert_toml_to_value(&value, span)),
 

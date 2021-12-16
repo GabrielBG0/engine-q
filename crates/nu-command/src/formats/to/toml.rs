@@ -42,47 +42,65 @@ impl Command for ToToml {
 
 // Helper method to recursively convert nu_protocol::Value -> toml::Value
 // This shouldn't be called at the top-level
-fn helper(v: &Value) -> Result<toml::Value, ShellError> {
+fn helper(v: &Value) -> Result<toml_edit::Value, ShellError> {
     Ok(match &v {
-        Value::Bool { val, .. } => toml::Value::Boolean(*val),
-        Value::Int { val, .. } => toml::Value::Integer(*val),
-        Value::Filesize { val, .. } => toml::Value::Integer(*val),
-        Value::Duration { val, .. } => toml::Value::String(val.to_string()),
-        Value::Date { val, .. } => toml::Value::String(val.to_string()),
-        Value::Range { .. } => toml::Value::String("<Range>".to_string()),
-        Value::Float { val, .. } => toml::Value::Float(*val),
-        Value::String { val, .. } => toml::Value::String(val.clone()),
-        Value::Record { cols, vals, .. } => {
-            let mut m = toml::map::Map::new();
-            for (k, v) in cols.iter().zip(vals.iter()) {
-                m.insert(k.clone(), helper(v)?);
-            }
-            toml::Value::Table(m)
+        Value::Bool { val, .. } => toml_edit::Value::Boolean(toml_edit::Formatted::new(*val)),
+        Value::Int { val, .. } => toml_edit::Value::Integer(toml_edit::Formatted::new(*val)),
+        Value::Filesize { val, .. } => toml_edit::Value::Integer(toml_edit::Formatted::new(*val)),
+        Value::Duration { val, .. } => {
+            toml_edit::Value::String(toml_edit::Formatted::new(val.to_string()))
         }
-        Value::List { vals, .. } => toml::Value::Array(toml_list(vals)?),
-        Value::Block { .. } => toml::Value::String("<Block>".to_string()),
-        Value::Nothing { .. } => toml::Value::String("<Nothing>".to_string()),
+        Value::Date { val, .. } => {
+            toml_edit::Value::String(toml_edit::Formatted::new(val.to_string()))
+        }
+        Value::Range { .. } => {
+            toml_edit::Value::String(toml_edit::Formatted::new("<Range>".to_string()))
+        }
+        Value::Float { val, .. } => toml_edit::Value::Float(toml_edit::Formatted::new(*val)),
+        Value::String { val, .. } => {
+            toml_edit::Value::String(toml_edit::Formatted::new(val.clone()))
+        }
+        Value::Record { cols, vals, .. } => {
+            let mut m = toml_edit::InlineTable::new();
+            for (k, v) in cols.iter().zip(vals.iter()) {
+                m.insert(k.clone().as_str(), helper(v)?);
+            }
+            toml_edit::Value::InlineTable(m)
+        }
+        Value::List { vals, .. } => toml_edit::Value::Array(toml_list(vals)?),
+        Value::Block { .. } => {
+            toml_edit::Value::String(toml_edit::Formatted::new("<Block>".to_string()))
+        }
+        Value::Nothing { .. } => {
+            toml_edit::Value::String(toml_edit::Formatted::new("<Nothing>".to_string()))
+        }
         Value::Error { error } => return Err(error.clone()),
-        Value::Binary { val, .. } => toml::Value::Array(
+        Value::Binary { val, .. } => toml_edit::Value::Array(
             val.iter()
-                .map(|x| toml::Value::Integer(*x as i64))
+                .map(|x| toml_edit::Value::Integer(toml_edit::Formatted::new(*x as i64)))
                 .collect(),
         ),
-        Value::CellPath { val, .. } => toml::Value::Array(
+        Value::CellPath { val, .. } => toml_edit::Value::Array(
             val.members
                 .iter()
                 .map(|x| match &x {
-                    PathMember::String { val, .. } => Ok(toml::Value::String(val.clone())),
-                    PathMember::Int { val, .. } => Ok(toml::Value::Integer(*val as i64)),
+                    PathMember::String { val, .. } => Ok(toml_edit::Value::String(
+                        toml_edit::Formatted::new(val.clone()),
+                    )),
+                    PathMember::Int { val, .. } => Ok(toml_edit::Value::Integer(
+                        toml_edit::Formatted::new(*val as i64),
+                    )),
                 })
-                .collect::<Result<Vec<toml::Value>, ShellError>>()?,
+                .collect::<Result<toml_edit::Array, ShellError>>()?,
         ),
-        Value::CustomValue { .. } => toml::Value::String("<Custom Value>".to_string()),
+        Value::CustomValue { .. } => {
+            toml_edit::Value::String(toml_edit::Formatted::new("<Custom Value>".to_string()))
+        }
     })
 }
 
-fn toml_list(input: &[Value]) -> Result<Vec<toml::Value>, ShellError> {
-    let mut out = vec![];
+fn toml_list(input: &[Value]) -> Result<toml_edit::Array, ShellError> {
+    let mut out = toml_edit::Array::new();
 
     for value in input {
         out.push(helper(value)?);
@@ -92,7 +110,7 @@ fn toml_list(input: &[Value]) -> Result<Vec<toml::Value>, ShellError> {
 }
 
 fn toml_into_pipeline_data(
-    toml_value: &toml::Value,
+    toml_value: &toml_edit::Value,
     value_type: Type,
     span: Span,
 ) -> Result<PipelineData, ShellError> {
@@ -109,7 +127,7 @@ fn toml_into_pipeline_data(
     }
 }
 
-fn value_to_toml_value(v: &Value) -> Result<toml::Value, ShellError> {
+fn value_to_toml_value(v: &Value) -> Result<toml_edit::Value, ShellError> {
     match v {
         Value::Record { .. } => helper(v),
         Value::List { ref vals, span } => match &vals[..] {
@@ -121,12 +139,17 @@ fn value_to_toml_value(v: &Value) -> Result<toml::Value, ShellError> {
         },
         Value::String { val, span } => {
             // Attempt to de-serialize the String
-            toml::de::from_str(val).map_err(|_| {
-                ShellError::UnsupportedInput(
-                    format!("{:?} unable to de-serialize string to TOML", val),
-                    *span,
-                )
-            })
+
+            let str = toml_edit::de::from_str(val.as_str())
+                .map_err(|_| {
+                    ShellError::UnsupportedInput(
+                        format!("{:?} unable to de-serialize string to TOML", val),
+                        *span,
+                    )
+                })
+                .unwrap();
+
+            Ok(toml_edit::Value::String(toml_edit::Formatted::new(str)))
         }
         _ => Err(ShellError::UnsupportedInput(
             format!("{:?} is not a valid top-level TOML", v.get_type()),
@@ -140,8 +163,8 @@ fn to_toml(input: PipelineData, span: Span) -> Result<PipelineData, ShellError> 
 
     let toml_value = value_to_toml_value(&value)?;
     match toml_value {
-        toml::Value::Array(ref vec) => match vec[..] {
-            [toml::Value::Table(_)] => toml_into_pipeline_data(
+        toml_edit::Value::Array(ref vec) => match vec {
+            [toml_edit::Value::Table(_)] => toml_into_pipeline_data(
                 vec.iter().next().expect("this should never trigger"),
                 value.get_type(),
                 span,

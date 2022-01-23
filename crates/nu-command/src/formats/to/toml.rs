@@ -114,13 +114,13 @@ fn toml_into_pipeline_data(
     value_type: Type,
     span: Span,
 ) -> Result<PipelineData, ShellError> {
-    match toml::to_string(&toml_value) {
-        Ok(serde_toml_string) => Ok(Value::String {
-            val: serde_toml_string,
+    match toml_value.as_str() {
+        Some(toml_string) => Ok(Value::String {
+            val: toml_string.to_string(),
             span,
         }
         .into_pipeline_data()),
-        _ => Ok(Value::Error {
+        None => Ok(Value::Error {
             error: ShellError::CantConvert("TOML".into(), value_type.to_string(), span),
         }
         .into_pipeline_data()),
@@ -163,7 +163,7 @@ fn to_toml(input: PipelineData, span: Span) -> Result<PipelineData, ShellError> 
 
     let toml_value = value_to_toml_value(&value)?;
     match toml_value {
-        toml_edit::Value::Array(ref vec) => match vec {
+        toml_edit::Value::Array(ref vec) => match vec[..] {
             [toml_edit::Value::Table(_)] => toml_into_pipeline_data(
                 vec.iter().next().expect("this should never trigger"),
                 value.get_type(),
